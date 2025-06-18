@@ -10,3 +10,4 @@ storage/Positions
 config.yaml
 
 logs/*
+.venv/*
