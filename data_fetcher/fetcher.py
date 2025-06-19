@@ -6,6 +6,8 @@ import os
 import time
 import akshare as ak
 
+from time_out_decorator import timeout
+
 
 def fetch_stock_data(code_name, period, start_date, adjust):
     adj = adjust
@@ -19,9 +21,7 @@ def fetch_stock_data(code_name, period, start_date, adjust):
         adjust=adj,
     )
     data.to_csv(
-        "/home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-            period, adjust, code_name
-        ),
+        "./data/{}/{}/{}.csv".format(period, adjust, code_name),
         index=False,
     )
     return True
@@ -32,80 +32,72 @@ def fetch_stock_listing_date(code_name):
     return True, inform.iloc[8]["value"]
 
 
-def fetch_all():
+@timeout(30)
+def fetch_all(stop_event=None):
 
     stocks = []
     with open(
-        "/home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/stocks.csv",
+        "./data/stocks.csv",
         mode="r",
         encoding="utf-8",
     ) as file:
         reader = csv.reader(file)
         next(reader)  # 跳过第一行（标题行）
         stocks = [row for row in reader]  # 读取剩余行
-
-    # 使用示例
-    for adjust in ["qfq", "hfq", "raw"]:
-        for period in ["daily", "monthly", "weekly"]:
-            os.makedirs(
-                "/home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}".format(
-                    period, adjust
-                ),
-                exist_ok=True,
-            )
-            for stock in stocks:
-                if (
-                    os.path.exists(
-                        "/home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-                            period, adjust, stock[0]
-                        )
-                    )
-                    == True
-                ):
-                    print(
-                        "skip /home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-                            period, adjust, stock[0]
-                        )
-                    )
-                    continue
-
-                get_stock_data = False
-                printed = False
-                while get_stock_data == False:
-                    try:
-                        get_stock_data, date = fetch_stock_listing_date(stock[0])
-                    except Exception as e:
-                        time.sleep(1)
-                        if printed == False:
-                            print(
-                                "refetch /home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-                                    period, adjust, stock[0]
-                                )
-                            )
-                            printed = True
-                get_stock_data = False
-                printed = False
-                while get_stock_data == False:
-                    try:
-                        get_stock_data = fetch_stock_data(
-                            stock[0], period, date, adjust
-                        )
-                    except Exception as e:
-                        time.sleep(1)
-                        if printed == False:
-                            print(
-                                "refetch /home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-                                    period, adjust, stock[0]
-                                )
-                            )
-                            printed = True
-                print(
-                    "get /home/yucheb/code/python/Sequoai-Cheb/data_fetcher/data/{}/{}/{}.csv".format(
-                        period, adjust, stock[0]
-                    )
+    while not stop_event.is_set():
+        # 使用示例
+        for adjust in ["qfq", "hfq", "raw"]:
+            for period in ["daily", "monthly", "weekly"]:
+                os.makedirs(
+                    "./data/{}/{}".format(period, adjust),
+                    exist_ok=True,
                 )
-                # time.sleep(10)
+                for stock in stocks:
+                    if stop_event.is_set():
+                        return
+                    if (
+                        os.path.exists(
+                            "./data/{}/{}/{}.csv".format(period, adjust, stock[0])
+                        )
+                        == True
+                    ):
+                        continue
+
+                    get_stock_data = False
+                    printed = False
+                    while get_stock_data == False:
+                        try:
+                            get_stock_data, date = fetch_stock_listing_date(stock[0])
+                        except Exception as e:
+                            if printed == False:
+                                print(
+                                    "refetch ./data/{}/{}/{}.csv".format(
+                                        period, adjust, stock[0]
+                                    )
+                                )
+                                printed = True
+                    get_stock_data = False
+                    printed = False
+                    while get_stock_data == False:
+                        try:
+                            get_stock_data = fetch_stock_data(
+                                stock[0], period, date, adjust
+                            )
+                        except Exception as e:
+                            time.sleep(0.1)
+                            if printed == False:
+                                print(
+                                    "refetch ./data/{}/{}/{}.csv".format(
+                                        period, adjust, stock[0]
+                                    )
+                                )
+                                printed = True
+                    print("get ./data/{}/{}/{}.csv".format(period, adjust, stock[0]))
+                    # time.sleep(10)
+    print("fetch successfully")
 
 
 if __name__ == "__main__":
-    fetch_all()
+    while True:
+        fetch_all()
+        time.sleep(2)
