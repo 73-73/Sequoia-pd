@@ -58,6 +58,9 @@ def fetch_stock_listing_date(code_name):
 
 # @timeout(30)
 def fetch_all(stop_event=None):
+    if not os.path.exists("./data/stocks.csv"):
+        all_data = ak.stock_zh_a_spot_em()
+        all_data.to_csv("./data/stocks.csv", columns=["代码", "名称"], index=False)
     stocks = []
     with open(
         "./data/stocks.csv",
@@ -67,8 +70,9 @@ def fetch_all(stop_event=None):
         reader = csv.reader(file)
         next(reader)  # 跳过第一行（标题行）
         stocks = [row for row in reader]  # 读取剩余行
+
     tasks = []
-    for adjust in ["qfq", "hfq", "raw"]:
+    for adjust in ["qfq", "hfq", "raw"]:  # 前复权、后复权、不复权
         for period in ["daily", "monthly", "weekly"]:
             os.makedirs(f"./data/{period}/{adjust}", exist_ok=True)
             for code in stocks:
@@ -76,7 +80,7 @@ def fetch_all(stop_event=None):
                 if not os.path.exists(file_path):  # 只添加未下载的任务
                     tasks.append((code[0], period, adjust))
     # 使用线程池并行执行
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=20) as executor:
         # 提交所有任务
         futures = [executor.submit(fetch_stock_data, *task) for task in tasks]
 
